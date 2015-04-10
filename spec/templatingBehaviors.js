@@ -188,20 +188,6 @@ describe('Templating', function() {
         expect(testNode.innerHTML).toEqual("Value = A");
     });
 
-    it('Should be able to pick template via an observable', function () {
-        ko.setTemplateEngine(new dummyTemplateEngine({
-            firstTemplate: "First template output",
-            secondTemplate: "Second template output"
-        }));
-
-        var chosenTemplate = ko.observable("firstTemplate");
-        ko.renderTemplate(chosenTemplate, null, null, testNode);
-        expect(testNode.innerHTML).toEqual("First template output");
-
-        chosenTemplate("secondTemplate");
-        expect(testNode.innerHTML).toEqual("Second template output");
-    });
-
     it('Should be able to render a template using data-bind syntax', function () {
         ko.setTemplateEngine(new dummyTemplateEngine({ someTemplate: "template output" }));
         testNode.innerHTML = "<div data-bind='template:\"someTemplate\"'></div>";
@@ -276,21 +262,6 @@ describe('Templating', function() {
 
         chosenTemplate("secondTemplate");
         expect(testNode.childNodes[0].innerHTML).toEqual("Second template output");
-    });
-
-    it('Should be able to pick template via an observable model property when specified as "name" in conjunction with "foreach"', function () {
-        ko.setTemplateEngine(new dummyTemplateEngine({
-            firstTemplate: "First",
-            secondTemplate: "Second"
-        }));
-
-        var chosenTemplate = ko.observable("firstTemplate");
-        testNode.innerHTML = "<div data-bind='template: { name: chosenTemplate, foreach: [1,2,3] }'></div>";
-        ko.applyBindings({ chosenTemplate: chosenTemplate }, testNode);
-        expect(testNode.childNodes[0].innerHTML).toEqual("FirstFirstFirst");
-
-        chosenTemplate("secondTemplate");
-        expect(testNode.childNodes[0].innerHTML).toEqual("SecondSecondSecond");
     });
 
     it('Should be able to pick template as a function of the data item using data-bind syntax, with the binding context available as a second parameter', function () {

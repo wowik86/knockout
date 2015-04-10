@@ -5,11 +5,11 @@
         // Note that as of Knockout 1.3, we only support jQuery.tmpl 1.0.0pre and later,
         // which KO internally refers to as version "2", so older versions are no longer detected.
         var jQueryTmplVersion = this.jQueryTmplVersion = (function() {
-            if (!jQueryInstance || !(jQueryInstance['tmpl']))
+            if ((typeof(jQuery) == "undefined") || !(jQuery['tmpl']))
                 return 0;
             // Since it exposes no official version number, we use our own numbering system. To be updated as jquery-tmpl evolves.
             try {
-                if (jQueryInstance['tmpl']['tag']['tmpl']['open'].toString().indexOf('__') >= 0) {
+                if (jQuery['tmpl']['tag']['tmpl']['open'].toString().indexOf('__') >= 0) {
                     // Since 1.0.0pre, custom tags should append markup to an array called "__"
                     return 2; // Final version of jquery.tmpl
                 }
@@ -24,7 +24,7 @@
         }
 
         function executeTemplate(compiledTemplate, data, jQueryTemplateOptions) {
-            return jQueryInstance['tmpl'](compiledTemplate, data, jQueryTemplateOptions);
+            return jQuery['tmpl'](compiledTemplate, data, jQueryTemplateOptions);
         }
 
         this['renderTemplateSource'] = function(templateSource, bindingContext, options) {
@@ -38,17 +38,17 @@
                 // Wrap in "with($whatever.koBindingContext) { ... }"
                 templateText = "{{ko_with $item.koBindingContext}}" + templateText + "{{/ko_with}}";
 
-                precompiled = jQueryInstance['template'](null, templateText);
+                precompiled = jQuery['template'](null, templateText);
                 templateSource['data']('precompiled', precompiled);
             }
 
             var data = [bindingContext['$data']]; // Prewrap the data in an array to stop jquery.tmpl from trying to unwrap any arrays
-            var jQueryTemplateOptions = jQueryInstance['extend']({ 'koBindingContext': bindingContext }, options['templateOptions']);
+            var jQueryTemplateOptions = jQuery['extend']({ 'koBindingContext': bindingContext }, options['templateOptions']);
 
             var resultNodes = executeTemplate(precompiled, data, jQueryTemplateOptions);
             resultNodes['appendTo'](document.createElement("div")); // Using "appendTo" forces jQuery/jQuery.tmpl to perform necessary cleanup work
 
-            jQueryInstance['fragments'] = {}; // Clear jQuery's fragment cache to avoid a memory leak after a large number of template renders
+            jQuery['fragments'] = {}; // Clear jQuery's fragment cache to avoid a memory leak after a large number of template renders
             return resultNodes;
         };
 
@@ -61,10 +61,10 @@
         };
 
         if (jQueryTmplVersion > 0) {
-            jQueryInstance['tmpl']['tag']['ko_code'] = {
+            jQuery['tmpl']['tag']['ko_code'] = {
                 open: "__.push($1 || '');"
             };
-            jQueryInstance['tmpl']['tag']['ko_with'] = {
+            jQuery['tmpl']['tag']['ko_with'] = {
                 open: "with($1) {",
                 close: "} "
             };

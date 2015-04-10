@@ -72,16 +72,8 @@ jasmine.Matchers.prototype.toThrowContaining = function(expected) {
     } catch (e) {
         exception = e;
     }
-    var exceptionMessage = exception && (exception.message || exception);
-
-    this.message = function () {
-        var notText = this.isNot ? " not" : "";
-        var expectation = "Expected " + this.actual.toString() + notText + " to throw exception containing '" + expected + "'";
-        var result = exception ? (", but it threw '" + exceptionMessage + "'") : ", but it did not throw anything";
-        return expectation + result;
-    }
-
-    return exception ? this.env.contains_(exceptionMessage, expected) : false;
+    this.actual = exception && (exception.message || exception);   // Fix explanatory message
+    return exception ? this.env.contains_(exception.message || exception, expected) : false;
 };
 
 jasmine.addScriptReference = function(scriptUrl) {
@@ -114,5 +106,3 @@ jasmine.ieVersion = typeof(document) == 'undefined' ? undefined : (function() {
         );
     return version > 4 ? version : undefined;
 }());
-
-jasmine.browserSupportsProtoAssignment = { __proto__: [] } instanceof Array;

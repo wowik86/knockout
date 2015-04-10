@@ -1,5 +1,3 @@
-// NOTE: This is a modified version of Jasmine for use with Knockout.
-
 var isCommonJS = typeof window == "undefined";
 
 /**
@@ -1591,7 +1589,7 @@ jasmine.FakeTimer.prototype.runFunctionsWithinRange = function(oldMillis, nowMil
       return a.runAtMillis - b.runAtMillis;
     });
     for (var i = 0; i < funcsToRun.length; ++i) {
-      //try {       // mbest: Removed so we can catch errors in asynchronous functions
+      try {
         var funcToRun = funcsToRun[i];
         this.nowMillis = funcToRun.runAtMillis;
         funcToRun.funcToCall();
@@ -1601,8 +1599,8 @@ jasmine.FakeTimer.prototype.runFunctionsWithinRange = function(oldMillis, nowMil
               funcToRun.millis,
               true);
         }
-      //} catch(e) {
-      //}
+      } catch(e) {
+      }
     }
     this.runFunctionsWithinRange(oldMillis, nowMillis);
   }

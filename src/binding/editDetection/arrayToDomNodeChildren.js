@@ -1,3 +1,4 @@
+
 (function () {
     // Objective:
     // * Given an input array, a container DOM node, and a function from array elements to arrays of DOM nodes,
@@ -24,7 +25,7 @@
 
             // Replace the contents of the mappedNodes array, thereby updating the record
             // of which nodes would be deleted if valueToMap was itself later removed
-            mappedNodes.length = 0;
+            mappedNodes.splice(0, mappedNodes.length);
             ko.utils.arrayPushAll(mappedNodes, newMappedNodes);
         }, null, { disposeWhenNodeIsRemoved: containerNode, disposeWhen: function() { return !ko.utils.anyDomNodeIsAttachedToDocument(mappedNodes); } });
         return { mappedNodes : mappedNodes, dependentObservable : (dependentObservable.isActive() ? dependentObservable : undefined) };

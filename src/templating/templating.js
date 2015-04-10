@@ -113,20 +113,6 @@
         return renderedNodesArray;
     }
 
-    function resolveTemplateName(template, data, context) {
-        // The template can be specified as:
-        if (ko.isObservable(template)) {
-            // 1. An observable, with string value
-            return template();
-        } else if (typeof template === 'function') {
-            // 2. A function of (data, context) returning a string
-            return template(data, context);
-        } else {
-            // 3. A string
-            return template;
-        }
-    }
-
     ko.renderTemplate = function (template, dataOrBindingContext, options, targetNodeOrNodeArray, renderMode) {
         options = options || {};
         if ((options['templateEngine'] || _templateEngine) == undefined)
@@ -146,9 +132,10 @@
                         ? dataOrBindingContext
                         : new ko.bindingContext(ko.utils.unwrapObservable(dataOrBindingContext));
 
-                    var templateName = resolveTemplateName(template, bindingContext['$data'], bindingContext),
-                        renderedNodesArray = executeTemplate(targetNodeOrNodeArray, renderMode, templateName, bindingContext, options);
+                    // Support selecting template as a function of the data being rendered
+                    var templateName = typeof(template) == 'function' ? template(bindingContext['$data'], bindingContext) : template;
 
+                    var renderedNodesArray = executeTemplate(targetNodeOrNodeArray, renderMode, templateName, bindingContext, options);
                     if (renderMode == "replaceNode") {
                         targetNodeOrNodeArray = renderedNodesArray;
                         firstTargetNode = getFirstNodeFromPossibleArray(targetNodeOrNodeArray);
@@ -176,8 +163,7 @@
             arrayItemContext = parentBindingContext['createChildContext'](arrayValue, options['as'], function(context) {
                 context['$index'] = index;
             });
-
-            var templateName = resolveTemplateName(template, arrayValue, arrayItemContext);
+            var templateName = typeof(template) == 'function' ? template(arrayValue, arrayItemContext) : template;
             return executeTemplate(null, "ignoreTargetNode", templateName, arrayItemContext, options);
         }
 
@@ -186,10 +172,6 @@
             activateBindingsOnContinuousNodeArray(addedNodesArray, arrayItemContext);
             if (options['afterRender'])
                 options['afterRender'](addedNodesArray, arrayValue);
-
-            // release the "cache" variable, so that it can be collected by
-            // the GC when its value isn't used from within the bindings anymore.
-            arrayItemContext = null;
         };
 
         return ko.dependentObservable(function () {
@@ -233,18 +215,15 @@
             return { 'controlsDescendantBindings': true };
         },
         'update': function (element, valueAccessor, allBindings, viewModel, bindingContext) {
-            var value = valueAccessor(),
-                dataValue,
-                options = ko.utils.unwrapObservable(value),
+            var templateName = ko.utils.unwrapObservable(valueAccessor()),
+                options = {},
                 shouldDisplay = true,
-                templateComputed = null,
-                templateName;
+                dataValue,
+                templateComputed = null;
 
-            if (typeof options == "string") {
-                templateName = value;
-                options = {};
-            } else {
-                templateName = options['name'];
+            if (typeof templateName != "string") {
+                options = templateName;
+                templateName = ko.utils.unwrapObservable(options['name']);
 
                 // Support "if"/"ifnot" conditions
                 if ('if' in options)

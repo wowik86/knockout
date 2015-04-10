@@ -1,29 +1,11 @@
 ko.utils = (function () {
-    function objectForEach(obj, action) {
+    var objectForEach = function(obj, action) {
         for (var prop in obj) {
             if (obj.hasOwnProperty(prop)) {
                 action(prop, obj[prop]);
             }
         }
-    }
-
-    function extend(target, source) {
-        if (source) {
-            for(var prop in source) {
-                if(source.hasOwnProperty(prop)) {
-                    target[prop] = source[prop];
-                }
-            }
-        }
-        return target;
-    }
-
-    function setPrototypeOf(obj, proto) {
-        obj.__proto__ = proto;
-        return obj;
-    }
-
-    var canSetPrototype = ({ __proto__: [] } instanceof Array);
+    };
 
     // Represent the known event types in a compact way, then at runtime transform it into a hash with event name as key (for fast lookup)
     var knownEvents = {}, knownEventTypesByEventName = {};
@@ -67,7 +49,7 @@ ko.utils = (function () {
 
         arrayForEach: function (array, action) {
             for (var i = 0, j = array.length; i < j; i++)
-                action(array[i], i);
+                action(array[i]);
         },
 
         arrayIndexOf: function (array, item) {
@@ -81,19 +63,15 @@ ko.utils = (function () {
 
         arrayFirst: function (array, predicate, predicateOwner) {
             for (var i = 0, j = array.length; i < j; i++)
-                if (predicate.call(predicateOwner, array[i], i))
+                if (predicate.call(predicateOwner, array[i]))
                     return array[i];
             return null;
         },
 
         arrayRemoveItem: function (array, itemToRemove) {
             var index = ko.utils.arrayIndexOf(array, itemToRemove);
-            if (index > 0) {
+            if (index >= 0)
                 array.splice(index, 1);
-            }
-            else if (index === 0) {
-                array.shift();
-            }
         },
 
         arrayGetDistinctValues: function (array) {
@@ -110,7 +88,7 @@ ko.utils = (function () {
             array = array || [];
             var result = [];
             for (var i = 0, j = array.length; i < j; i++)
-                result.push(mapping(array[i], i));
+                result.push(mapping(array[i]));
             return result;
         },
 
@@ -118,7 +96,7 @@ ko.utils = (function () {
             array = array || [];
             var result = [];
             for (var i = 0, j = array.length; i < j; i++)
-                if (predicate(array[i], i))
+                if (predicate(array[i]))
                     result.push(array[i]);
             return result;
         },
@@ -143,13 +121,16 @@ ko.utils = (function () {
             }
         },
 
-        canSetPrototype: canSetPrototype,
-
-        extend: extend,
-
-        setPrototypeOf: setPrototypeOf,
-
-        setPrototypeOfOrExtend: canSetPrototype ? setPrototypeOf : extend,
+        extend: function (target, source) {
+            if (source) {
+                for(var prop in source) {
+                    if(source.hasOwnProperty(prop)) {
+                        target[prop] = source[prop];
+                    }
+                }
+            }
+            return target;
+        },
 
         objectForEach: objectForEach,
 
@@ -232,7 +213,7 @@ ko.utils = (function () {
 
                 // Rule [A]
                 while (continuousNodeArray.length && continuousNodeArray[0].parentNode !== parentNode)
-                    continuousNodeArray.shift();
+                    continuousNodeArray.splice(0, 1);
 
                 // Rule [B]
                 if (continuousNodeArray.length > 1) {
@@ -264,6 +245,17 @@ ko.utils = (function () {
                 string.trim ?
                     string.trim() :
                     string.toString().replace(/^[\s\xa0]+|[\s\xa0]+$/g, '');
+        },
+
+        stringTokenize: function (string, delimiter) {
+            var result = [];
+            var tokens = (string || "").split(delimiter);
+            for (var i = 0, j = tokens.length; i < j; i++) {
+                var trimmed = ko.utils.stringTrim(tokens[i]);
+                if (trimmed !== "")
+                    result.push(trimmed);
+            }
+            return result;
         },
 
         stringStartsWith: function (string, startsWith) {
@@ -304,9 +296,23 @@ ko.utils = (function () {
         },
 
         registerEventHandler: function (element, eventType, handler) {
-            var mustUseAttachEvent = eventsThatMustBeRegisteredUsingAttachEvent[eventType];
-            if (!mustUseAttachEvent && jQueryInstance) {
-                jQueryInstance(element)['bind'](eventType, handler);
+            var mustUseAttachEvent = ieVersion && eventsThatMustBeRegisteredUsingAttachEvent[eventType];
+            if (!mustUseAttachEvent && typeof jQuery != "undefined") {
+                if (isClickOnCheckableElement(element, eventType)) {
+                    // For click events on checkboxes, jQuery interferes with the event handling in an awkward way:
+                    // it toggles the element checked state *after* the click event handlers run, whereas native
+                    // click events toggle the checked state *before* the event handler.
+                    // Fix this by intecepting the handler and applying the correct checkedness before it runs.
+                    var originalHandler = handler;
+                    handler = function(event, eventData) {
+                        var jQuerySuppliedCheckedState = this.checked;
+                        if (eventData)
+                            this.checked = eventData.checkedStateBeforeEvent !== true;
+                        originalHandler.call(this, event);
+                        this.checked = jQuerySuppliedCheckedState; // Restore the state jQuery applied
+                    };
+                }
+                jQuery(element)['bind'](eventType, handler);
             } else if (!mustUseAttachEvent && typeof element.addEventListener == "function")
                 element.addEventListener(eventType, handler, false);
             else if (typeof element.attachEvent != "undefined") {
@@ -327,14 +333,13 @@ ko.utils = (function () {
             if (!(element && element.nodeType))
                 throw new Error("element must be a DOM node when calling triggerEvent");
 
-            // For click events on checkboxes and radio buttons, jQuery toggles the element checked state *after* the
-            // event handler runs instead of *before*. (This was fixed in 1.9 for checkboxes but not for radio buttons.)
-            // IE doesn't change the checked state when you trigger the click event using "fireEvent".
-            // In both cases, we'll use the click method instead.
-            var useClickWorkaround = isClickOnCheckableElement(element, eventType);
-
-            if (jQueryInstance && !useClickWorkaround) {
-                jQueryInstance(element)['trigger'](eventType);
+            if (typeof jQuery != "undefined") {
+                var eventData = [];
+                if (isClickOnCheckableElement(element, eventType)) {
+                    // Work around the jQuery "click events on checkboxes" issue described above by storing the original checked state before triggering the handler
+                    eventData.push({ checkedStateBeforeEvent: element.checked });
+                }
+                jQuery(element)['trigger'](eventType, eventData);
             } else if (typeof document.createEvent == "function") {
                 if (typeof element.dispatchEvent == "function") {
                     var eventCategory = knownEventTypesByEventName[eventType] || "HTMLEvents";
@@ -344,13 +349,15 @@ ko.utils = (function () {
                 }
                 else
                     throw new Error("The supplied element doesn't support dispatchEvent");
-            } else if (useClickWorkaround && element.click) {
-                element.click();
             } else if (typeof element.fireEvent != "undefined") {
+                // Unlike other browsers, IE doesn't change the checked state of checkboxes/radiobuttons when you trigger their "click" event
+                // so to make it consistent, we'll do it manually here
+                if (isClickOnCheckableElement(element, eventType))
+                    element.checked = element.checked !== true;
                 element.fireEvent("on" + eventType);
-            } else {
-                throw new Error("Browser doesn't support triggering events");
             }
+            else
+                throw new Error("Browser doesn't support triggering events");
         },
 
         unwrapObservable: function (value) {
@@ -382,7 +389,7 @@ ko.utils = (function () {
             // we'll clear everything and create a single text node.
             var innerTextNode = ko.virtualElements.firstChild(element);
             if (!innerTextNode || innerTextNode.nodeType != 3 || ko.virtualElements.nextSibling(innerTextNode)) {
-                ko.virtualElements.setDomNodeChildren(element, [element.ownerDocument.createTextNode(value)]);
+                ko.virtualElements.setDomNodeChildren(element, [document.createTextNode(value)]);
             } else {
                 innerTextNode.data = value;
             }
@@ -502,14 +509,12 @@ ko.utils = (function () {
             for (var key in data) {
                 // Since 'data' this is a model object, we include all properties including those inherited from its prototype
                 var input = document.createElement("input");
-                input.type = "hidden";
                 input.name = key;
                 input.value = ko.utils.stringifyJson(ko.utils.unwrapObservable(data[key]));
                 form.appendChild(input);
             }
             objectForEach(params, function(key, value) {
                 var input = document.createElement("input");
-                input.type = "hidden";
                 input.name = key;
                 input.value = value;
                 form.appendChild(input);
